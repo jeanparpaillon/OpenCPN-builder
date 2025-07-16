@@ -1,4 +1,4 @@
-FROM ubuntu:jammy AS base-builder
+FROM ubuntu:jammy AS base-dev
 
 COPY sources.list /etc/apt/sources.list
 
@@ -40,7 +40,7 @@ RUN \
     ln -s llvm-ar i686-linux-android-ranlib && \
     ln -s llvm-ar x86_64-linux-android-ranlib
 
-FROM base-builder AS qt-builder
+FROM base-dev AS qt-builder
 
 COPY sources.list /etc/apt/sources.list
 
@@ -170,7 +170,7 @@ RUN \
 # Cleanup
 RUN rm -rf wxWidgets
 
-FROM base-builder AS opencpn-builder
+FROM base-dev AS builder
 
 COPY --from qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
 COPY --from wxwidgets-dev ${WXWIDGETS_ROOT} ${WXWIDGETS_ROOT}
