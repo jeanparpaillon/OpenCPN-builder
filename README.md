@@ -1,3 +1,4 @@
-OpenCPN builder for Android
----------------------------
+OpenCPN builder
+---------------
 
+Docker containers for building OpenCPN

@@ -6,13 +6,13 @@ ocpn_android_core_build_support_archive = cache/OCPNAndroidCoreBuildSupport-1.2.
 ocpn_android_core_build_support_sha256sum = c4110c532e9a0bcf071bbd10fe6f7627d7e91380c803c52ac0e89ce5f993db9b
 
 opencpn_vsn = $(shell git submodule status opencpn | awk -e '{ print $$ 1 }')
-apk_vsn = $(shell git describe --always)
+opencpn_apk_vsn = $(shell git describe --always)
 android_img_vsn = 2023.12-ndk
 
 build_dir = $(build_base)/opencpn_$(opencpn_vsn)
 libgorp_android_armhf = $(build_dir)/$(target)/libgorp.so
 
-all: $(libgorp_android_armhf)
+all:
 
 $(libgorp_android_armhf): | $(ocpn_android_core_build_support) $(build_dir) builder_android_armhf
 	rm -rf $(@D) && \
@@ -37,7 +37,14 @@ $(ocpn_android_core_build_support_archive):
 	wget -O $@ https://github.com/bdbcat/OCPNAndroidCoreBuildSupport/releases/download/v1.2/OCPNAndroidCoreBuildSupport.zip
 	sha256sum -c $(patsubst %.zip,%.sum,$@) > /dev/null
 
-builder_android_armhf:
+builder_apk:
+	cd docker && \
+	  docker build \
+	    --target $@ \
+	    --tag $@ \
+	    .
+
+builder_corelibs:
 	cd docker && \
 	  docker build \
 	    --target $@ \

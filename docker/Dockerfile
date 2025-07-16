@@ -1,25 +1,176 @@
-FROM cimg/android:2023.12-ndk AS builder_android_armhf
+FROM ubuntu:jammy AS base-builder
 
-ARG UID
-ARG GID
+COPY sources.list /etc/apt/sources.list
 
-ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV DEBIAN_FRONTEND=noninterative
 
-USER root:root
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-RUN apt -q update
-RUN apt install cmake git gettext python3-pip
-RUN python3 -m pip install --user --force-reinstall -q pip setuptools
-RUN apt remove python3-six python3-colorama python3-urllib3
-RUN python3 -m pip install --user cloudsmith-cli cryptography
+ENV ANDROID_NDK_VERSION=r27c
+ENV ANDROID_MIN_API=21
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV ANDROID_NDK_ROOT=/opt/android-sdk/ndk/${ANDROID_NDK_VERSION}
 
-ADD build-corelibs-android_armhf.sh /scripts/build-corelibs-android_armhf.sh
-RUN chmod a+rx /home/circleci
-RUN install -d -o $UID -g $GID /src /build
+ENV QT_ANDROID_ROOT=/opt/Qt-android
+ENV WXWIDGETS_ROOT=/opt/wxWidgets
 
-USER $UID:$GID
-WORKDIR /src
+RUN \
+    dpkg --add-architecture arm64 && \
+    apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get -y install build-essential && \
+    apt-get -y install gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu pip gdb git iputils-ping \
+    lzip nano perl python3 python3-pip wget flex bison gperf \
+    g++-aarch64-linux-gnu gcc-aarch64-linux-gnu ninja-build cmake \
 
-CMD /scripts/build-corelibs-android_armhf.sh
+# Android
+RUN \
+    apt-get install -y openjdk-11-jdk sdkmanager && \
+    sdkmanager "platforms;android-${ANDROID_MIN_API}" "platform-tools" "build-tools;21.0.2" && \
+    sdkmanager "platforms;android-33" "platform-tools" "build-tools;33.0.0" && \
+    sdkmanager "ndk;${ANDROID_NDK_VERSION}"
+
+# Workaround for NDK >= 23 (see https://bugreports.qt.io/browse/QTBUG-108662)
+RUN \
+    cd /opt/android-sdk/ndk/${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin && \
+    ln -s llvm-ar aarch64-linux-android-ranlib && \
+    ln -s llvm-ar armv7a-linux-android-ranlib && \
+    ln -s llvm-ar i686-linux-android-ranlib && \
+    ln -s llvm-ar x86_64-linux-android-ranlib
+
+FROM base-builder AS qt-builder
+
+COPY sources.list /etc/apt/sources.list
+
+RUN \
+    apt-get -y update && \
+    apt-get -y install freeglut3-dev:arm64 \
+    libgl1-mesa-dev:arm64 libglu1-mesa-dev:arm64 libjpeg-dev:arm64 libmysqlclient-dev:arm64 \
+    libnss3-dev:arm64 libopus-dev:arm64 libpng-dev:arm64 libsqlite3-dev:arm64 libssl-dev:arm64 \
+    libx11-xcb-dev:arm64 libxcb-xinerama0-dev:arm64 libxcb-xkb-dev:arm64 libxcb1-dev:arm64 \
+    libxcursor-dev:arm64 libxi-dev:arm64 libxml2-dev:arm64 libxrender-dev:arm64 libxslt-dev:arm64 \
+    mesa-common-dev:arm64 valgrind zlib1g-dev:arm64 '^libxcb.*-dev:arm64' \
+    libxkbcommon-dev:arm64 libxkbcommon-x11-dev:arm64 libwayland-dev:arm64 \
+    libicu-dev:arm64 libxslt-dev:arm64 ruby libxcursor-dev:arm64 libxcomposite-dev:arm64 \
+    libxdamage-dev:arm64 libxrandr-dev:arm64 libxtst-dev:arm64 libxss-dev:arm64 libdbus-1-dev:arm64 \
+    libevent-dev:arm64 libfontconfig1-dev:arm64 libcap-dev:arm64 libpulse-dev:arm64 libudev-dev:arm64 \
+    libpci-dev:arm64 libnss3-dev:arm64 libasound2-dev:arm64 libegl1-mesa-dev:arm64 gperf bison nodejs \
+    libasound2-dev:arm64 libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
+    libgstreamer-plugins-good1.0-dev:arm64 libnspr4-dev:arm64 libcups2-dev:arm64 \
+    libmng-dev:arm64 libwebp-dev:arm64 libxcb-xinput-dev:arm64 libwebpmux3:arm64 libvpx-dev:arm64 \
+    libavformat-dev:arm64 libavcodec-dev:arm64 libavutil-dev:arm64 libswresample-dev:arm64 libswscale-dev:arm64 libavdevice-dev:arm64 libzstd-dev:arm64 \
+    libpcre2-dev:arm64 libclang-dev:arm64 libllvm14:arm64 libxshmfence-dev:arm64 libxkbfile-dev:arm64 libbluetooth-dev:arm64 \
+    libsctp-dev:arm64 libsnappy-dev:arm64 libmd4c-dev:arm64 libmd4c-html0-dev:arm64 libharfbuzz-dev:arm64 libminizip-dev:arm64 \
+    libb2-dev:arm64 libva-dev:arm64 && \
+    \
+    apt-get -y install freeglut3-dev libgl1-mesa-dev libglu1-mesa-dev libjpeg-dev libmysqlclient-dev \
+    libnss3-dev libopus-dev libpng-dev libsqlite3-dev libssl-dev \
+    libx11-xcb-dev libxcb-xinerama0-dev libxcb-xkb-dev libxcb1-dev \
+    libxcursor-dev libxi-dev libxml2-dev libxrender-dev libxslt-dev mesa-common-dev \
+    zlib1g-dev '^libxcb.*-dev' libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+    libicu-dev libxslt-dev libxcursor-dev libxcomposite-dev libxdamage-dev libxrandr-dev libxtst-dev \
+    libxss-dev libdbus-1-dev libevent-dev libfontconfig1-dev libcap-dev libpulse-dev libudev-dev \
+    libpci-dev libnss3-dev libasound2-dev libegl1-mesa-dev libasound2-dev libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev libnspr4-dev libcups2-dev \
+    libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev libavdevice-dev \
+    libmng-dev libwebp-dev libxcb-xinput-dev libwebpmux3 libvpx-dev zstd libzstd-dev \
+    libpcre2-dev libclang-dev libllvm14 python3 python3-html5lib libxshmfence-dev libxkbfile-dev libbluetooth-dev \
+    libsctp-dev libsnappy-dev libmd4c-dev libmd4c-html0-dev libharfbuzz-dev libminizip-dev libb2-dev libva-dev
+
+
+# aqt
+RUN \
+    apt-get -y install \
+    libdbus-1-3 \
+    libpulse-mainloop-glib0
+
+RUN pip3 install aqtinstall
+
+# Cleanup
+RUN \
+    apt-get -y autoremove && \
+    apt-get -y autoclean && \
+    apt-get -y clean && \
+    rm -rf /var/lib/apt/lists/*
+
+FROM qt-builder AS qt-dev
+
+ARG QT_BRANCH=5.15
+ARG QT_VERSION=5.15.17-lts-lgpl
+ARG OPENSSL_VERSION=0025bbe48f69792f95e02c9289df0fae68c954d6
+
+# Checkout qt5 and openssl
+RUN \
+    git clone --verbose --depth 1 --branch ${QT_BRANCH} https://code.qt.io/qt/qt5.git && \
+    cd qt5 && \
+    perl init-repository --module-subset=default,-qtwebengine,-qtwayland
+
+RUN \
+    git clone --verbose https://github.com/KDAB/android_openssl /opt/android-openssl && \
+    cd /opt/android-openssl && \
+    git checkout ${OPENSSL_VERSION}
+
+# Build qt-android
+RUN \
+  mkdir build_android && \
+  cd build_android && \
+  ../qt5/configure -opensource -confirm-license -release -skip webengine -nomake tests -nomake examples -android-ndk ${ANDROID_NDK_ROOT} -android-sdk ${ANDROID_SDK_ROOT} -no-warnings-are-errors -xplatform android-clang -prefix /opt/Qt-android -disable-rpath -android-ndk-host linux-x86_64 --recheck -openssl-runtime -I /opt/android-openssl/ssl_1.1/include && \
+  make -j $(($(nproc)+4)) && \
+  make install && \
+  cp config.summary /opt/Qt-android
+
+# Cleanup
+RUN \
+    rm -rf qt5 build_amd64 build_arm64 build_android
+
+FROM base-dev AS wxwidgets-dev
+
+# https://wiki.wxwidgets.org/WxAndroid/build
+ARG WXWIDGETS_URL=https://github.com/wxWidgets/wxWidgets.git
+ARG WXWIDGETS_VERSION=3.1.7
+# See https://develooperkit.com/android-api-level.html
+
+# Copy dev env
+COPY --from qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
+
+# Checkout
+RUN \
+    git clone --verbose ${WXWIDGETS_URL} wxWidgets && \
+    cd wxWidgets && \
+    git checkout v${WXWIDGETS_VERSION} && \
+    git submodule update --init
+
+# Build
+
+# For env :
+# See https://developer.android.com/ndk/guides/other_build_systems?hl=fr
+RUN \
+    mkdir wxWidgets/build_android && \
+    cd wxWidgets/build_android && \
+    export TOOLCHAIN=${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64 && \
+    export TARGET=aarch64-linux-android && \
+    export API=${ANDROID_MIN_API} && \
+    export AR=${TOOLCHAIN}/bin/llvm-ar && \
+    export CC="${TOOLCHAIN}/bin/clang --target=${TARGET}${API}" && \
+    export AS=$CC && \
+    export CXX="${TOOLCHAIN}/bin/clang++ --target=${TARGET}${API}" && \
+    export LD=${TOOLCHAIN}/bin/ld && \
+    export RANLIB=${TOOLCHAIN}/bin/llvm-ranlib && \
+    export STRIP=${TOOLCHAIN}/bin/llvm-strip && \
+    export QT5_CUSTOM_DIR=${QT_ANDROID_ROOT} && \
+    ../configure --with-qt \
+            --host=${TARGET}  --disable-compat28 --disable-shared \
+            --disable-arttango --enable-image --disable-dragimage --disable-sockets \
+            --with-libtiff=no --without-opengl --disable-baseevtloop --disable-utf8 && \
+    make -j $(($(nproc)+4)) && \
+    make install DESTDIR=${WXWIDGETS_ROOT}
+
+# Cleanup
+RUN rm -rf wxWidgets
+
+FROM base-builder AS opencpn-builder
+
+COPY --from qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
+COPY --from wxwidgets-dev ${WXWIDGETS_ROOT} ${WXWIDGETS_ROOT}
