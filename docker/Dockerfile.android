@@ -23,7 +23,7 @@ RUN \
     apt-get -y install build-essential && \
     apt-get -y install gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu pip gdb git iputils-ping \
     lzip nano perl python3 python3-pip wget flex bison gperf \
-    g++-aarch64-linux-gnu gcc-aarch64-linux-gnu ninja-build cmake \
+    g++-aarch64-linux-gnu gcc-aarch64-linux-gnu ninja-build cmake
 
 # Android
 RUN \
