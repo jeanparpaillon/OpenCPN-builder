@@ -1,3 +1,0 @@
-[submodule "opencpn"]
-	path = opencpn
-	url = git@github.com:OpenCPN/OpenCPN.git

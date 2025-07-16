@@ -133,7 +133,7 @@ ARG WXWIDGETS_VERSION=3.1.7
 # See https://develooperkit.com/android-api-level.html
 
 # Copy dev env
-COPY --from qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
+COPY --from=qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
 
 # Checkout
 RUN \
@@ -172,5 +172,5 @@ RUN rm -rf wxWidgets
 
 FROM base-dev AS builder
 
-COPY --from qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
-COPY --from wxwidgets-dev ${WXWIDGETS_ROOT} ${WXWIDGETS_ROOT}
+COPY --from=qt-dev ${QT_ANDROID_ROOT} ${QT_ANDROID_ROOT}
+COPY --from=wxwidgets-dev ${WXWIDGETS_ROOT} ${WXWIDGETS_ROOT}
